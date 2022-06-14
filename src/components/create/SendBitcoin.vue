@@ -150,7 +150,8 @@ export default class SendBitcoin extends Vue {
             this.currentComponent = 'ConfirmLedgerTransaction';
             break;
           case constants.WALLET_LIQUALITY:
-            this.currentComponent = 'ConfirmLiqualityTransaction'
+            this.currentComponent = 'ConfirmLiqualityTransaction';
+            break;
           default:
             this.currentComponent = 'ConfirmTrezorTransaction';
             break;
