@@ -1,0 +1,61 @@
+NAME: 2WP-app deploy UI for TestNet
+
+on:
+  push:
+    tags:
+      - '**'
+    branches:
+      - main
+      - '*-rc'
+
+jobs:
+  checkout-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get tag name.
+        id: get_tag_name
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.get_tag_name.outputs.VERSION }}
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: >
+          VUE_APP_HOTJAR_ID=${{ secrets.VUE_APP_HOTJAR_ID }}
+          VUE_APP_COIN=${{ secrets.VUE_APP_COIN }}
+          VUE_APP_MANIFEST_EMAIL=${{ secrets.VUE_APP_MANIFEST_EMAIL }}
+          VUE_APP_MANIFEST_APP_URL=${{ secrets.VUE_APP_MANIFEST_APP_URL }}
+          VUE_APP_API_BASE_URL=${{ secrets.VUE_APP_API_BASE_URL }}
+          VUE_APP_RSK_NODE_HOST=${{ secrets.VUE_APP_RSK_NODE_HOST }}
+          VUE_APP_RSK_EXPLORER=${{ secrets.VUE_APP_RSK_EXPLORER }}
+          VUE_APP_WALLET_ADDRESSES_PER_CALL_TREZOR=${{ secrets.VUE_APP_WALLET_ADDRESSES_PER_CALL_TREZOR }}
+          VUE_APP_WALLET_MAX_CALLS_TREZOR=${{ secrets.VUE_APP_WALLET_MAX_CALLS_TREZOR }}
+          VUE_APP_WALLET_ADDRESSES_PER_CALL_LEDGER=${{ secrets.VUE_APP_WALLET_ADDRESSES_PER_CALL_LEDGER }}
+          VUE_APP_WALLET_MAX_CALLS_LEDGER=${{ secrets.VUE_APP_WALLET_MAX_CALLS_LEDGER }}
+          npm run-script build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Deploy site to S3
+        run: |
+          aws s3 sync --delete --only-show-errors dist/ ${{ secrets.S3_BUCKET }}
+           
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION }} --paths "/*"
